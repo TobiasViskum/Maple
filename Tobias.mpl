@@ -11,34 +11,58 @@ Tobias := module()
         local intervaller::list := [];
         local interval::string;
 
-        local interval_fmt_string::string := "%s%s; %s]";
+        local interval_fmt_string::string := "%s%s%s; %s%s";
         local mon_string::string;
         local final_string::string := "\n";
 
         local lower_bound::realcons := lhs(rhs(range));
         local upper_bound::realcons := rhs(rhs(range));
 
-        # Special behavior: Floats w/ 3 decimals, infinite display
-        local stringify := proc(val::realcons)
+        local picked_lower_bound::realcons;
+        local picked_upper_bound::realcons;
+
+        # Returns: "float" | "posinf" | "neginf"
+        local get_inf_kind := proc(val::realcons)
             if convert(val, string) = "infinity" then
-                return "&infin;";
+                return "posinf";
             elif convert(val, string) = "-infinity" then
+                return "neginf";
+            else
+                return "float";
+            end if;
+        end proc;
+
+        # Behavior: Displays floats with 3 decimals and infinite as symbols
+        local stringify := proc(val::realcons)
+            local inf_kind := get_inf_kind(val);
+            if inf_kind = "posinf" then
+                return "&infin;";
+            elif inf_kind = "neginf" then
                 return "-&infin;";
             else
                 return sprintf("%.3f", val);
             end if;
         end proc;
 
-        # kind = "max" | "min"
-        local pick := proc(kind::string, l::realcons, r::realcons)
-            local val::realcons;
-            if kind = "max" then
-                val := max(l, r);
+        # Kind = "upper" | "lower"
+        # Returns: "[" | "]"
+        local get_bracket_kind := proc(kind::string, val::realcons)
+            local inf_kind::string := get_inf_kind(val);
+
+            if kind = "upper" then
+                if inf_kind = "float" then
+                    return "]";
+                else
+                    return "[";
+                end if;
             else
-                val := min(l, r);    
+                if inf_kind = "float" then
+                    return "[";
+                else
+                    return "]";
+                end if;
             end if;
-            return stringify(val);
-        end proc:
+        end proc;
 
         # Kind = "down" | "up"
         local get_mon_string := proc(kind::string, x_val::realcons)
@@ -52,11 +76,11 @@ Tobias := module()
             hældning := subs(x = offset_x_val, diff(f, x));
 
             if hældning > 0 then
-                return "Voksende i [";
+                return "Voksende i ";
             else
-                return "Aftagende i [";
+                return "Aftagende i ";
             end if;
-        end proc:
+        end proc;
 
         # Pushes an interval to the list `intervaller`
         local push_interval := proc(item::string)
@@ -73,30 +97,46 @@ Tobias := module()
 
             if i = 0 then
                 mon_string := get_mon_string("down", solution);
+                picked_lower_bound := max(lower_bound, -infinity);
+                picked_upper_bound := min(upper_bound, solution);
+
                 push_interval(sprintf(
                     interval_fmt_string,
                     mon_string,
-                    pick("max", lower_bound, -infinity),
-                    pick("min", upper_bound, solution)
+                    get_bracket_kind("lower", picked_lower_bound),
+                    stringify(picked_lower_bound),
+                    stringify(picked_upper_bound),
+                    get_bracket_kind("upper", picked_lower_bound)
                 ));
             end if;
 
             mon_string := get_mon_string("up", solution);
+
             if nops(solutions) = i + 1 then
+                picked_lower_bound := max(lower_bound, solution);
+                picked_upper_bound := min(upper_bound, infinity);
+                
                 push_interval(sprintf(
                     interval_fmt_string,
                     mon_string,
-                    pick("max", lower_bound, solution),
-                    pick("min", upper_bound, infinity)
+                    get_bracket_kind("lower", picked_lower_bound),
+                    stringify(picked_lower_bound),
+                    stringify(picked_upper_bound),
+                    get_bracket_kind("upper", picked_upper_bound)
                 ));
             else
                 next_solution := rhs(solutions[i + 2][1]);
+                picked_lower_bound := max(lower_bound, solution);
+                picked_upper_bound := min(upper_bound, next_solution);
+
                 push_interval(sprintf(
                     interval_fmt_string,
                     mon_string,
-                    pick("max", lower_bound, solution),
-                    pick("min", upper_bound, next_solution)
-                ))
+                    get_bracket_kind("lower", picked_lower_bound),
+                    stringify(picked_lower_bound),
+                    stringify(picked_upper_bound),
+                    get_bracket_kind("upper", picked_upper_bound)
+                ));
             end if;
 
             i := i + 1;
@@ -121,4 +161,6 @@ Tobias := module()
 
         return final_string;
     end proc;
+
+    
 end module:
