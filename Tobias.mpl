@@ -1,7 +1,32 @@
 Tobias := module()
-    description "Mine Maple-kommandoer";
+    description "Tobias' Maple-kommandoer";
     option package;
-    export monotoniforhold;
+    export monotoniforhold, bestemtTangentIPunkt;
+
+    bestemtTangentIPunkt := proc(diffEq, punkt)
+        local xcoord::realcons := op(1, punkt);
+        local ycoord::realcons := op(2, punkt);
+
+        # Den fuldstændige løsning
+        local sol := dsolve(diffEq);
+
+        # Navnet på funktionen givet f.eks. `y` i `y(x)`
+        local fnName := op(0, lhs(sol));
+
+        # Navnet på den afhængige variabel f.eks. `x` eller `t`
+        local dependantVar := op(1, lhs(sol));
+
+        # Den partikulære løsning
+        local fn := unapply(rhs(dsolve({diffEq, fnName(xcoord) = ycoord})), dependantVar);
+
+        # Hældningen i punktet x0
+        local hældning := eval(diff(fn(dependantVar), dependantVar), dependantVar = xcoord);
+
+        # Tangentligningen
+        local tangent := hældning * (x - xcoord) + fn(xcoord);
+
+        return y = tangent;
+    end proc;    
 
     monotoniforhold := proc(f, range := x=-infinity..infinity)
         local i::posint := 0;
@@ -22,7 +47,7 @@ Tobias := module()
         local picked_upper_bound::realcons;
 
         # Returns: "float" | "posinf" | "neginf"
-        local get_inf_kind := proc(val::realcons)
+        local get_val_kind := proc(val::realcons)
             if convert(val, string) = "infinity" then
                 return "posinf";
             elif convert(val, string) = "-infinity" then
@@ -34,7 +59,7 @@ Tobias := module()
 
         # Behavior: Displays floats with 3 decimals and infinite as symbols
         local stringify := proc(val::realcons)
-            local inf_kind := get_inf_kind(val);
+            local inf_kind := get_val_kind(val);
             if inf_kind = "posinf" then
                 return "&infin;";
             elif inf_kind = "neginf" then
@@ -47,7 +72,7 @@ Tobias := module()
         # Kind = "upper" | "lower"
         # Returns: "[" | "]"
         local get_bracket_kind := proc(kind::string, val::realcons)
-            local inf_kind::string := get_inf_kind(val);
+            local inf_kind::string := get_val_kind(val);
 
             if kind = "upper" then
                 if inf_kind = "float" then
@@ -73,7 +98,7 @@ Tobias := module()
                 offset_x_val := x_val + 0.1;
             end if;
 
-            hældning := subs(x = offset_x_val, diff(f, x));
+            hældning := evalf(subs(x = offset_x_val, diff(f, x)));
 
             if hældning > 0 then
                 return "Voksende i ";
@@ -146,11 +171,15 @@ Tobias := module()
         # then there must be at least one interval present
         if nops(intervaller) = 0 then
             mon_string := get_mon_string("up", lower_bound);
+
+
             push_interval(sprintf(
                 interval_fmt_string,
                 mon_string,
+                get_bracket_kind("lower", lower_bound),
                 stringify(lower_bound),
-                stringify(upper_bound)
+                stringify(upper_bound),
+                get_bracket_kind("upper", upper_bound)
             ));
         end if;
 
@@ -160,7 +189,5 @@ Tobias := module()
         end do;
 
         return final_string;
-    end proc;
-
-    
+    end proc;  
 end module:
